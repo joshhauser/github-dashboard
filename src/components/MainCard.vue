@@ -1,45 +1,26 @@
 <script lang="ts" setup>
   import { Client } from '@/shared/client';
   import { onMounted, ref } from 'vue';
-  import axios from 'axios';
-  import { Utils } from '@/shared/utils';
   import Stat from '@/components/Stat.vue';
-  import { GITHUB_PAGINATION_HEADER_REGEX as GITHUB_PAGINATION_TOTAL_REGEX } from '@/shared/constants';
+  import { GITHUB_PAGINATION_TOTAL_REGEX } from '@/shared/constants';
 
   const userInfo = ref<any>({});
-  const repositoriesCount = ref<number>(0);
-  let reposToFetch: boolean = true;
   const languages = ref<any>({});
   const repositories = ref<any[]>([]);
-  const topLanguage = ref();
+  const topLanguage = ref('');
 
-  const fetchRepositories = async () => {
+  const fetchRepositories = async (): Promise<any[]> => {
     let page: number = 1;
     let totalPage: number = -1;
+    let reposToFetch: boolean = true;
+    const _repositories: any[] = [];
 
     while (reposToFetch) {
       const response = await Client.getUserRepositories(100, page);
       if (!response.data) {
-        return;
+        return _repositories;
       }
-      repositories.value.push(...response.data);
-
-      repositories.value.forEach(async (repo) => {
-        if (repo.owner.login == 'joshhauser') {
-          const _response = await Client.getRepositoryLanguages(
-            repo.owner.login,
-            repo.name
-          );
-
-          if (_response) {
-            Object.entries(_response.data).forEach(([key, value]) => {
-              languages.value[key] = languages.value[key]
-                ? languages.value[key] + value
-                : value;
-            });
-          }
-        }
-      });
+      _repositories.push(...response.data);
 
       const link = response.headers.link || null;
       if (link) {
@@ -58,14 +39,53 @@
         reposToFetch = false;
       }
     }
+
+    return _repositories;
   };
 
-  onMounted(() => {
+  const fetchRepositoriesLanguages = async () => {
+    const _languages: { [key: string]: number } = {};
+
+    for (const repo of repositories.value) {
+      if (repo.owner.login == 'joshhauser') {
+        const _response = await Client.getRepositoryLanguages(
+          repo.owner.login,
+          repo.name
+        );
+
+        if (_response) {
+          Object.entries(_response.data).forEach(([key, value]) => {
+            _languages[key] = _languages[key] ? _languages[key] + value : value;
+          });
+        }
+      }
+    }
+
+    return _languages;
+  };
+
+  const setMostUsedLanguages = () => {
+    const languagesAsArray = Object.entries(languages.value);
+    const _topLanguage = languagesAsArray.reduce(
+      (max: any[], current: any[]) => {
+        return max[1] > current[1] ? max : current;
+      },
+      languagesAsArray
+    );
+
+    topLanguage.value = _topLanguage[0];
+  };
+
+  onMounted(async () => {
     Client.getUserInfo().then((res) => {
       userInfo.value = res.data;
     });
 
-    fetchRepositories();
+    repositories.value = await fetchRepositories();
+    if (repositories.value.length > 0) {
+      languages.value = await fetchRepositoriesLanguages();
+      setMostUsedLanguages();
+    }
   });
 </script>
 

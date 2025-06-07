@@ -1,11 +1,13 @@
 <script setup lang="ts">
+  import type { PropType } from 'vue';
+
   defineProps({
     title: {
       type: String,
       required: true,
     },
     value: {
-      type: String,
+      type: [String, Number],
       required: true,
     },
     unit: {
