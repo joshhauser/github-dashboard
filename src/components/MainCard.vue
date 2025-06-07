@@ -1,13 +1,32 @@
 <script lang="ts" setup>
   import { Client } from '@/shared/client';
-  import { onMounted, ref } from 'vue';
+  import { onMounted, ref, watch } from 'vue';
   import Stat from '@/components/Stat.vue';
   import { GITHUB_PAGINATION_TOTAL_REGEX } from '@/shared/constants';
+  import type { LanguageUsage } from '@/shared/models';
+  import { useGithubDataStore } from '@/shared/store/github-data.store';
 
-  const userInfo = ref<any>({});
-  const languages = ref<any>({});
-  const repositories = ref<any[]>([]);
-  const topLanguage = ref('');
+  const githubDataStore = useGithubDataStore();
+
+  const userInfo = ref<any>(undefined);
+  const languages = ref<LanguageUsage[]>([]);
+  const repositories = ref<any[]>([{}, {}, {}, {}]);
+  const topLanguage = ref<LanguageUsage>({ language: 'Python', usage: 1 });
+  const isLoading = ref<boolean>(true);
+
+  watch(
+    [userInfo, languages, repositories],
+    ([_userInfo, _languages, _repositories]) => {
+      if (
+        _userInfo != undefined &&
+        _languages.length > 0 &&
+        _repositories.length > 0
+      ) {
+        isLoading.value = false;
+      }
+    },
+    { deep: true }
+  );
 
   const fetchRepositories = async (): Promise<any[]> => {
     let page: number = 1;
@@ -61,19 +80,22 @@
       }
     }
 
-    return _languages;
+    Object.entries(_languages).forEach(([key, value]) => {
+      languages.value.push({ language: key, usage: value });
+    });
+
+    githubDataStore.languages = languages.value;
   };
 
   const setMostUsedLanguages = () => {
-    const languagesAsArray = Object.entries(languages.value);
-    const _topLanguage = languagesAsArray.reduce(
-      (max: any[], current: any[]) => {
-        return max[1] > current[1] ? max : current;
+    const _topLanguage = languages.value.reduce(
+      (max: LanguageUsage, current: LanguageUsage) => {
+        return max.usage > current.usage ? max : current;
       },
-      languagesAsArray
+      languages.value[0]
     );
 
-    topLanguage.value = _topLanguage[0];
+    topLanguage.value = _topLanguage;
   };
 
   onMounted(async () => {
@@ -83,14 +105,17 @@
 
     repositories.value = await fetchRepositories();
     if (repositories.value.length > 0) {
-      languages.value = await fetchRepositoriesLanguages();
+      await fetchRepositoriesLanguages();
       setMostUsedLanguages();
     }
+
+    githubDataStore.languages = languages.value;
   });
 </script>
 
 <template>
-  <Card>
+  <Skeleton v-if="isLoading" height="400px" class="w-full" />
+  <Card v-else>
     <template #content>
       <div class="flex flex-col lg:flex-row items-center">
         <div class="mr-5">
@@ -118,7 +143,10 @@
               title="Repositories"
               :value="repositories.length.toString()"
             />
-            <Stat title="Top language/framework" :value="topLanguage" />
+            <Stat
+              title="Top language/framework"
+              :value="topLanguage.language"
+            />
           </div>
         </div>
       </div>
