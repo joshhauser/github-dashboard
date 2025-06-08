@@ -1,7 +1,7 @@
 <script lang="ts" setup>
   import { useGithubDataStore } from '@/shared/store/github-data.store';
-  import { Utils } from '@/shared/utils';
-  import { ref, onMounted, watch } from 'vue';
+  import { ref, watch } from 'vue';
+  import { PALETTE } from '@/shared/constants';
 
   const githubDataStore = useGithubDataStore();
 
@@ -70,12 +70,12 @@
     const datasetValues: number[] = [];
     const bgColors: string[] = [];
     const borderColors: string[] = [];
-    githubDataStore.languages.forEach((lang) => {
+    githubDataStore.languages.forEach((lang, index) => {
       dataConfig.labels.push(lang.language);
       datasetValues.push(lang.usage);
-      const color = generateColor();
-      bgColors.push(color.background);
-      borderColors.push(color.border);
+      const color = PALETTE[index];
+      bgColors.push(color.toString());
+      borderColors.push(color.toStringWithTransparency());
     });
 
     dataConfig.datasets[0].data = datasetValues;
@@ -83,16 +83,6 @@
     dataConfig.datasets[0].borderColor = borderColors;
 
     return dataConfig;
-  };
-
-  const generateColor = () => {
-    const r = Utils.inclusiveRandInt(0, 255);
-    const g = Utils.inclusiveRandInt(0, 255);
-    const b = Utils.inclusiveRandInt(0, 255);
-    return {
-      background: `rgba(${r}, ${g}, ${b}, 0.5)`,
-      border: `rgb(${r}, ${g}, ${b})`,
-    };
   };
 </script>
 
